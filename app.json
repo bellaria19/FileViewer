@@ -36,6 +36,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "b98aba43-fd77-4b86-84bb-3ad3bfccb0bb"
+      }
+    },
+    "owner": "bellaria"
   }
 }
