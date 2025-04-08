@@ -1,50 +1,82 @@
-# Welcome to your Expo app 👋
+# File Viewer
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A mobile application built with React Native and Expo that allows users to view various file types including text files, images, PDFs, and EPUBs.
 
-## Get started
+## Features
 
-1. Install dependencies
+- 📄 View text files (.txt)
+- 🖼️ View images (.jpg, .png, etc.)
+- 📑 View PDF documents
+- 📚 View EPUB e-books
+- 🔄 Recent files list
+- 📤 Share files
+- ⚙️ Cache management
 
+## Tech Stack
+
+- React Native
+- Expo
+- TypeScript
+- expo-router for navigation
+- expo-file-system for file operations
+- expo-document-picker for selecting files
+- react-native-webview for rendering PDFs and EPUBs
+
+## Installation
+
+1. Clone the repository
+2. Install dependencies
    ```bash
    npm install
+   # or
+   yarn install
    ```
-
-2. Start the app
-
+3. Start the development server
    ```bash
-    npx expo start
+   npm start
+   # or
+   yarn start
    ```
 
-In the output, you'll find options to open the app in a
+## Project Structure
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+file-viewer/
+├── app/                 # Expo Router app directory
+│   ├── _layout.tsx      # Root layout component
+│   ├── index.tsx        # Home screen (file selection)
+│   ├── viewer.tsx       # File viewer screen
+│   └── settings.tsx     # Settings screen
+│
+├── components/          # Reusable components
+│   ├── Header.tsx       # Custom header component
+│   ├── TextPreview.tsx  # Text file preview component
+│   ├── ImagePreview.tsx # Image preview component
+│   └── WebPreview.tsx   # Web-based file preview (PDF, EPUB)
+│
+├── utils/               # Utility functions
+│   ├── fileTypes.ts     # File type utilities
+│   └── fileCache.ts     # File cache management
+│
+└── assets/              # App assets
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Usage
 
-## Learn more
+1. Launch the app
+2. Tap on "Select File" to choose a file from your device
+3. The app will display the file using an appropriate viewer
+4. Recent files are saved for quick access
+5. Use the Settings screen to manage the app's cache
 
-To learn more about developing your project with Expo, look at the following resources:
+## Supported File Types
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- Text files (.txt)
+- Images (.jpg, .png, .gif, etc.)
+- PDF documents (.pdf)
+- EPUB e-books (.epub)
+- HTML files (.html)
 
-## Join the community
+## License
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+MIT
