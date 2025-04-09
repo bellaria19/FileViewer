@@ -9,7 +9,14 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIFileSharingEnabled": true,
+        "LSSupportsOpeningDocumentsInPlace": true,
+        "NSPhotoLibraryUsageDescription": "이미지 파일을 선택하기 위해 사진 라이브러리 접근 권한이 필요합니다.",
+        "NSDocumentsFolderUsageDescription": "문서 파일을 읽고 저장하기 위해 문서 폴더 접근 권한이 필요합니다.",
+        "UISupportsDocumentBrowser": true
+      }
     },
     "android": {
       "adaptiveIcon": {
