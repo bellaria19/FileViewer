@@ -1,13 +1,24 @@
 // app/index.tsx 수정
 import React, { useState, useEffect } from "react";
-import { Text, View, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import {
+  Text,
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
 import { FontAwesome } from "@expo/vector-icons";
 import { useRouter, Stack } from "expo-router";
 import { getFileTypeInfo, formatFileSize } from "../utils/fileTypes";
-import { initializeFileStorage, importFile } from "../utils/fileStorage";
+import {
+  initializeFileStorage,
+  importFile,
+  getMetadataPath,
+} from "../utils/fileStorage";
 
 interface FileItem {
   uri: string;
@@ -19,10 +30,12 @@ interface FileItem {
 
 export default function Index() {
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [isImporting, setIsImporting] = useState<boolean>(false);
+  const [importProgress, setImportProgress] = useState<string>("");
   const router = useRouter();
 
   // 저장된 파일 메타데이터 경로
-  const metadataPath = `${FileSystem.documentDirectory}files_metadata.json`;
+  const metadataPath = getMetadataPath();
 
   // 파일 메타데이터 저장
   const saveFilesMetadata = async (filesData: FileItem[]) => {
@@ -68,50 +81,99 @@ export default function Index() {
     });
   }, []);
 
-  // 파일 선택 및 저장
-  const pickDocument = async () => {
+  // 파일 선택 및 저장 (다중 선택 지원)
+  const pickDocuments = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["*/*"],
         copyToCacheDirectory: true,
+        multiple: true, // 다중 선택 활성화
       });
 
       if (result.canceled) {
         return;
       }
 
-      const file = result.assets[0];
-
-      // 파일 존재 확인
-      const fileInfo = await FileSystem.getInfoAsync(file.uri);
-      if (!fileInfo.exists) {
-        Alert.alert("오류", "파일이 존재하지 않거나 접근할 수 없습니다");
+      // 선택된 파일이 있는지 확인
+      if (result.assets.length === 0) {
         return;
       }
 
-      // 앱 저장소로 파일 가져오기
-      const storedUri = await importFile(file.uri, file.name);
+      // 가져오기 작업 시작
+      setIsImporting(true);
 
-      // 새 파일 항목 생성
-      const newFile: FileItem = {
-        uri: storedUri,
-        name: file.name,
-        type: file.mimeType,
-        size: file.size,
-        dateAdded: Date.now(),
-      };
+      // 선택한 모든 파일들 가져오기
+      const newFiles: FileItem[] = [];
+      let importedCount = 0;
+      let firstImportedFile: FileItem | null = null;
+
+      for (const file of result.assets) {
+        try {
+          setImportProgress(
+            `파일 가져오는 중... (${importedCount + 1}/${result.assets.length})`
+          );
+
+          // 파일 존재 확인
+          const fileInfo = await FileSystem.getInfoAsync(file.uri);
+          if (!fileInfo.exists) {
+            console.warn(`파일이 존재하지 않음: ${file.name}`);
+            continue;
+          }
+
+          // 앱 저장소로 파일 가져오기
+          const storedUri = await importFile(file.uri, file.name);
+
+          // 가져온 파일이 실제로 존재하는지 확인
+          const storedFileInfo = await FileSystem.getInfoAsync(storedUri);
+          if (!storedFileInfo.exists) {
+            console.warn(`저장소에 파일을 가져올 수 없음: ${file.name}`);
+            continue;
+          }
+
+          // 새 파일 항목 생성
+          const newFile: FileItem = {
+            uri: storedUri,
+            name: file.name,
+            type: file.mimeType,
+            size: file.size,
+            dateAdded: Date.now(),
+          };
+
+          // 첫 번째 가져온 파일 저장 (나중에 뷰어로 이동할 때 사용)
+          if (importedCount === 0) {
+            firstImportedFile = newFile;
+          }
+
+          newFiles.push(newFile);
+          importedCount++;
+        } catch (error) {
+          console.error(`파일 가져오기 오류 (${file.name}):`, error);
+        }
+      }
+
+      // 가져온 파일이 없는 경우
+      if (newFiles.length === 0) {
+        setIsImporting(false);
+        Alert.alert("오류", "선택한 파일을 가져오는 데 실패했습니다.");
+        return;
+      }
 
       // 파일 목록 업데이트
       setFiles((prevFiles) => {
-        // 이미 존재하는 파일이면 업데이트
-        const fileExists = prevFiles.findIndex((f) => f.name === file.name);
+        // 기존 파일 목록과 새 파일 목록 병합
+        // 이미 존재하는 파일은 새 버전으로 교체
+        const updatedFiles = [...prevFiles];
 
-        let updatedFiles: FileItem[];
-        if (fileExists >= 0) {
-          updatedFiles = [...prevFiles];
-          updatedFiles[fileExists] = newFile;
-        } else {
-          updatedFiles = [newFile, ...prevFiles];
+        for (const newFile of newFiles) {
+          const existingIndex = updatedFiles.findIndex(
+            (f) => f.name === newFile.name
+          );
+
+          if (existingIndex >= 0) {
+            updatedFiles[existingIndex] = newFile; // 기존 파일 업데이트
+          } else {
+            updatedFiles.unshift(newFile); // 새 파일은 목록 앞에 추가
+          }
         }
 
         // 메타데이터 저장
@@ -119,18 +181,30 @@ export default function Index() {
         return updatedFiles;
       });
 
-      // 파일 뷰어로 이동
-      router.push({
-        pathname: "/viewer",
-        params: {
-          uri: storedUri,
-          name: file.name,
-          type: file.mimeType,
-        },
-      });
+      // 가져오기 작업 완료
+      setIsImporting(false);
+
+      // 가져온 파일이 한 개인 경우 즉시 뷰어로 이동
+      if (newFiles.length === 1 && firstImportedFile) {
+        router.push({
+          pathname: "/viewer",
+          params: {
+            uri: firstImportedFile.uri,
+            name: firstImportedFile.name,
+            type: firstImportedFile.type,
+          },
+        });
+      } else if (newFiles.length > 1) {
+        // 여러 파일을 가져온 경우 결과 알림
+        Alert.alert(
+          "파일 가져오기 완료",
+          `${newFiles.length}개의 파일을 성공적으로 가져왔습니다.`
+        );
+      }
     } catch (error) {
       console.error("파일 선택 오류:", error);
       Alert.alert("오류", "파일 선택 중 문제가 발생했습니다");
+      setIsImporting(false);
     }
   };
 
@@ -205,14 +279,31 @@ export default function Index() {
         }}
       />
 
-      <TouchableOpacity style={styles.pickButton} onPress={pickDocument}>
-        <FontAwesome name="plus" size={20} color="white" />
-        <Text style={styles.buttonText}>파일 선택</Text>
+      <TouchableOpacity
+        style={[styles.pickButton, isImporting && styles.pickButtonDisabled]}
+        onPress={pickDocuments}
+        disabled={isImporting}
+      >
+        {isImporting ? (
+          <>
+            <ActivityIndicator
+              size="small"
+              color="white"
+              style={{ marginRight: 10 }}
+            />
+            <Text style={styles.buttonText}>{importProgress}</Text>
+          </>
+        ) : (
+          <>
+            <FontAwesome name="plus" size={20} color="white" />
+            <Text style={styles.buttonText}>여러 파일 선택</Text>
+          </>
+        )}
       </TouchableOpacity>
 
       {files.length > 0 ? (
         <View style={styles.filesContainer}>
-          <Text style={styles.sectionTitle}>내 파일</Text>
+          <Text style={styles.sectionTitle}>내 파일 ({files.length})</Text>
           <FlashList
             data={files}
             keyExtractor={(item) => item.uri}
@@ -255,7 +346,7 @@ export default function Index() {
           <FontAwesome name="folder-open-o" size={60} color="#ccc" />
           <Text style={styles.emptyText}>파일이 없습니다</Text>
           <Text style={styles.emptySubtext}>
-            "파일 선택" 버튼을 눌러 파일을 추가하세요
+            "여러 파일 선택" 버튼을 눌러 파일을 추가하세요
           </Text>
         </View>
       )}
@@ -281,6 +372,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  pickButtonDisabled: {
+    backgroundColor: "#8ba5c9",
   },
   buttonText: {
     color: "white",
